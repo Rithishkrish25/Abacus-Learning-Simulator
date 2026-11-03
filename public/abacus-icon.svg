@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Background -->
+  <rect width="64" height="64" rx="10" fill="#8B4513"/>
+
+  <!-- Abacus frame -->
+  <!-- Top bar -->
+  <rect x="6" y="8" width="52" height="5" rx="2" fill="#5C2D0A"/>
+  <!-- Bottom bar -->
+  <rect x="6" y="51" width="52" height="5" rx="2" fill="#5C2D0A"/>
+  <!-- Left post -->
+  <rect x="6" y="8" width="5" height="48" rx="2" fill="#5C2D0A"/>
+  <!-- Right post -->
+  <rect x="53" y="8" width="5" height="48" rx="2" fill="#5C2D0A"/>
+
+  <!-- Divider bar -->
+  <rect x="6" y="29" width="52" height="3" rx="1" fill="#5C2D0A"/>
+
+  <!-- Rod 1 -->
+  <rect x="17" y="8" width="2" height="48" rx="1" fill="#A0522D"/>
+  <!-- Rod 2 -->
+  <rect x="27" y="8" width="2" height="48" rx="1" fill="#A0522D"/>
+  <!-- Rod 3 -->
+  <rect x="37" y="8" width="2" height="48" rx="1" fill="#A0522D"/>
+  <!-- Rod 4 -->
+  <rect x="47" y="8" width="2" height="48" rx="1" fill="#A0522D"/>
+
+  <!-- Upper beads (heaven beads) - 1 per rod, moved down toward divider -->
+  <ellipse cx="18" cy="24" rx="5" ry="4" fill="#F5A623"/>
+  <ellipse cx="28" cy="24" rx="5" ry="4" fill="#E8E8E8"/>
+  <ellipse cx="38" cy="22" rx="5" ry="4" fill="#F5A623"/>
+  <ellipse cx="48" cy="24" rx="5" ry="4" fill="#E8E8E8"/>
+
+  <!-- Lower beads (earth beads) - 2 per rod, moved up toward divider -->
+  <!-- Rod 1 lower beads -->
+  <ellipse cx="18" cy="36" rx="5" ry="4" fill="#F5A623"/>
+  <ellipse cx="18" cy="44" rx="5" ry="4" fill="#F5A623"/>
+
+  <!-- Rod 2 lower beads -->
+  <ellipse cx="28" cy="38" rx="5" ry="4" fill="#E8E8E8"/>
+  <ellipse cx="28" cy="46" rx="5" ry="4" fill="#E8E8E8"/>
+
+  <!-- Rod 3 lower beads -->
+  <ellipse cx="38" cy="36" rx="5" ry="4" fill="#F5A623"/>
+  <ellipse cx="38" cy="44" rx="5" ry="4" fill="#F5A623"/>
+
+  <!-- Rod 4 lower beads -->
+  <ellipse cx="48" cy="38" rx="5" ry="4" fill="#E8E8E8"/>
+  <ellipse cx="48" cy="46" rx="5" ry="4" fill="#E8E8E8"/>
+</svg>
