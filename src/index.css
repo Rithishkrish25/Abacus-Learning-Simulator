@@ -501,13 +501,18 @@ html, body, #root {
    MODE SELECT SCREEN
    ═══════════════════════════════════════════════════════════════════════════ */
 .mode-select-root {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 100%;
+  /* min-height: 100% would resolve to 0 inside overflow:hidden parent;
+     absolute + inset:0 gives us a proper 100vh scroll container instead */
   padding: 32px 20px 24px;
   background: #e8ddd0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   gap: 0;
 }
 
@@ -579,6 +584,17 @@ html, body, #root {
   font-size: 2.8rem;
   line-height: 1;
   margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+/* Text column wrapper — flex:1 + min-width:0 lets it shrink properly in row layout */
+.mode-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  align-items: center;    /* centred on desktop (column card) */
+  text-align: center;
 }
 
 .mode-card-title {
@@ -641,25 +657,76 @@ html, body, #root {
 
 /* ── Mobile stacking ── */
 @media (max-width: 640px) {
-  .mode-select-root { padding: 24px 16px 20px; }
-  .mode-select-header { margin-bottom: 24px; }
-  .mode-select-logo { font-size: 2.4rem; }
-  .mode-select-cards { gap: 14px; }
+  /* Tighten the scroll container padding */
+  .mode-select-root { padding: 20px 14px 24px; }
+
+  /* Compact header — reduce vertical footprint */
+  .mode-select-header { margin-bottom: 16px; }
+  .mode-select-logo   { font-size: 2rem; margin-bottom: 6px; }
+  .mode-select-title  { font-size: 1.25rem; }
+  .mode-select-subtitle { font-size: 0.68rem; margin-top: 2px; }
+
+  /* Cards: tighter gap */
+  .mode-select-cards { gap: 10px; }
+
+  /* Card: row layout, compact padding */
   .mode-card {
     flex: 1 1 100%;
     max-width: 100%;
     flex-direction: row;
     text-align: left;
-    padding: 18px 18px;
-    gap: 14px;
-    align-items: flex-start;
+    padding: 14px 14px;
+    gap: 12px;
+    align-items: center;
   }
+
+  /* Emoji: fixed size, no overflow */
   .mode-card-emoji {
-    font-size: 2.2rem;
+    font-size: 1.8rem;
     margin-bottom: 0;
+    width: 2.4rem;
+    text-align: center;
     flex-shrink: 0;
   }
-  .mode-card-description { margin-bottom: 12px; }
+
+  /* Text column: left-aligned, constrained */
+  .mode-card-body {
+    align-items: flex-start;
+    text-align: left;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .mode-card-title {
+    font-size: 0.95rem;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mode-card-description {
+    font-size: 0.76rem;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    /* Clamp to 2 lines to prevent card from growing too tall */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  /* Button: compact, left-aligned */
+  .mode-card-btn {
+    font-size: 0.80rem;
+    padding: 7px 18px;
+    min-height: 36px;
+    min-width: 80px;
+    align-self: flex-start;
+  }
+
+  /* Footer: tighter */
+  .mode-select-footer { margin-top: 16px; font-size: 0.74rem; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

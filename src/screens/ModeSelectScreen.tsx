@@ -72,15 +72,17 @@ export function ModeSelectScreen({ onNavigate }: ModeSelectScreenProps) {
             <div className="mode-card-emoji" aria-hidden="true">
               {card.emoji}
             </div>
-            <h2 className="mode-card-title">{card.title}</h2>
-            <p className="mode-card-description">{card.description}</p>
-            <button
-              className={`mode-card-btn${card.isPrimary ? ' mode-card-btn--primary' : ' mode-card-btn--secondary'}`}
-              onClick={() => onNavigate(card.id)}
-              aria-label={`${card.buttonLabel} — ${card.title}`}
-            >
-              {card.buttonLabel}
-            </button>
+            <div className="mode-card-body">
+              <h2 className="mode-card-title">{card.title}</h2>
+              <p className="mode-card-description">{card.description}</p>
+              <button
+                className={`mode-card-btn${card.isPrimary ? ' mode-card-btn--primary' : ' mode-card-btn--secondary'}`}
+                onClick={() => onNavigate(card.id)}
+                aria-label={`${card.buttonLabel} — ${card.title}`}
+              >
+                {card.buttonLabel}
+              </button>
+            </div>
           </div>
         ))}
       </div>
