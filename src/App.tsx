@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import { LevelScreen } from './screens/LevelScreen';
 import { LevelMapScreen } from './screens/LevelMapScreen';
+import { AbacusScene } from './components/AbacusScene';
 import { useAbacusStore } from './store/useAbacusStore';
 import { useProgressStore } from './store/useProgressStore';
 import { LEVEL_DEFINITIONS } from './levels/levelDefinitions';
@@ -74,24 +75,45 @@ function App() {
 
   if (view === 'map') {
     return (
-      <LevelMapScreen
-        onSelectLevel={(idx) => {
-          reset();
-          setActiveLevelIdx(idx);
-          setLevelKey((k) => k + 1);
-          setView('level');
-        }}
-        onBack={handleBackFromMap}
-      />
+      <>
+        <LevelMapScreen
+          onSelectLevel={(idx) => {
+            reset();
+            setActiveLevelIdx(idx);
+            setLevelKey((k) => k + 1);
+            setView('level');
+          }}
+          onBack={handleBackFromMap}
+        />
+        {/* Keep a hidden AbacusScene mounted so the WebGL context and HDR
+            environment asset stay warm while the user browses the level map.
+            When LevelScreen mounts it will reuse the already-compiled shaders
+            and cached environment texture. */}
+        <div style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', overflow: 'hidden', top: 0, left: 0 }} aria-hidden="true">
+          <AbacusScene visible={false} />
+        </div>
+      </>
     );
   }
 
-  // default: welcome
+  // default: welcome — render a tiny hidden AbacusScene so WebGL + HDR
+  // environment initialises while the user reads the welcome screen.
+  // By the time they click START, most of the 5-second cost is already paid.
   return (
-    <WelcomeScreen
-      onStart={handleStart}
-      onReviewProgress={handleReviewProgress}
-    />
+    <>
+      <WelcomeScreen
+        onStart={handleStart}
+        onReviewProgress={handleReviewProgress}
+      />
+      {/* Warm-up canvas: 1×1 px, invisible, no pointer events.
+          Starts WebGL context + loads Environment preset in the background. */}
+      <div
+        style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', overflow: 'hidden', top: 0, left: 0 }}
+        aria-hidden="true"
+      >
+        <AbacusScene visible={false} />
+      </div>
+    </>
   );
 }
 

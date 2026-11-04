@@ -207,14 +207,11 @@ export function SorobanBead({
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
-      <sphereGeometry args={[radius, 80, 40]} />
-      <meshPhysicalMaterial
+      <sphereGeometry args={[radius, 32, 20]} />
+      <meshStandardMaterial
         color={baseColour}
         roughness={beadColour.roughness}
         metalness={beadColour.metalness}
-        clearcoat={0.65}
-        clearcoatRoughness={0.18}
-        reflectivity={0.5}
         envMapIntensity={1.0}
         emissive={emissiveColour}
         emissiveIntensity={emissiveIntensity}

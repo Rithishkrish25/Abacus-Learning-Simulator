@@ -4445,3 +4445,10 @@ html, body, #root {
   .ls-summary-next-en  { font-size: 0.95rem; }
   .ls-summary-stat-val { font-size: 1.6rem; }
 }
+
+/* ── Scene loading shimmer ── */
+@keyframes ls-loading-shimmer {
+  0%   { opacity: 0.55; transform: scaleX(0.7); }
+  50%  { opacity: 1.00; transform: scaleX(1.0); }
+  100% { opacity: 0.55; transform: scaleX(0.7); }
+}
