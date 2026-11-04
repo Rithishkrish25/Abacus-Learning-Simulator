@@ -4,9 +4,10 @@ import { LEVEL_DEFINITIONS } from '../levels/levelDefinitions';
 
 interface LevelMapScreenProps {
   onSelectLevel: (levelIndex: number) => void;
+  onBack: () => void;
 }
 
-export function LevelMapScreen({ onSelectLevel }: LevelMapScreenProps) {
+export function LevelMapScreen({ onSelectLevel, onBack }: LevelMapScreenProps) {
   const levelStatus  = useProgressStore((s) => s.levelStatus);
   const levelScores  = useProgressStore((s) => s.levelScores);
   const unlockedBadges = useProgressStore((s) => s.unlockedBadges);
@@ -26,10 +27,9 @@ export function LevelMapScreen({ onSelectLevel }: LevelMapScreenProps) {
 
       {/* ── Header ── */}
       <header className="lvlmap-header">
-        <div className="lvlmap-logo" aria-hidden="true">🧮</div>
+        <button className="practice-back-btn" onClick={onBack} aria-label="Back to welcome">← Back</button>
         <div className="lvlmap-header-text">
-          <h1 className="lvlmap-title">Soroban Learning</h1>
-          <p className="lvlmap-title-ta">சோரோபன் கற்றல்</p>
+          <h1 className="lvlmap-title">My Journey · என் பயணம்</h1>
           <p className="lvlmap-subtitle">Grade 1 · Japanese Abacus · 算盤</p>
         </div>
         {/* Progress ring summary */}

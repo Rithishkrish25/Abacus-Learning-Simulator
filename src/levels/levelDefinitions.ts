@@ -31,6 +31,12 @@ export interface LevelPhase {
   questionCount?: number;
   /** For challenge: how many correct to pass */
   passScore?: number;
+  /**
+   * Countdown timer in seconds for the entire play phase.
+   * Undefined = no timer (observe/guided/free-explore phases).
+   * Timer starts when the first interactive question begins.
+   */
+  timeLimitSeconds?: number;
   /** Short Tamil label shown in phase indicator */
   labelTa: string;
   /** Short English label shown in phase indicator */
@@ -83,7 +89,7 @@ export const LEVEL_DEFINITIONS: LevelDefinition[] = [
       { type: 'guided',  lessonStepId: 13, labelEn: 'Try 2',      labelTa: '2 முயற்சி' },
       { type: 'guided',  lessonStepId: 5,  labelEn: 'Try 3',      labelTa: '3 முயற்சி' },
       { type: 'guided',  lessonStepId: 14, labelEn: 'Try 4',      labelTa: '4 முயற்சி' },
-      { type: 'challenge', challengeMax: 4, questionCount: 4, passScore: 4, labelEn: 'Challenge', labelTa: 'சவால்' },
+      { type: 'challenge', challengeMax: 4, questionCount: 4, passScore: 4, timeLimitSeconds: 90, labelEn: 'Challenge', labelTa: 'சவால்' },
     ],
   },
   {
@@ -101,7 +107,7 @@ export const LEVEL_DEFINITIONS: LevelDefinition[] = [
       { type: 'guided', lessonStepId: 16, labelEn: 'Show 7',     labelTa: '7 காட்டு' },
       { type: 'guided', lessonStepId: 7,  labelEn: 'Show 8',     labelTa: '8 காட்டு' },
       { type: 'guided', lessonStepId: 17, labelEn: 'Show 9',     labelTa: '9 காட்டு' },
-      { type: 'challenge', challengeMax: 9, questionCount: 5, passScore: 4, labelEn: 'Challenge', labelTa: 'சவால்' },
+      { type: 'challenge', challengeMax: 9, questionCount: 5, passScore: 4, timeLimitSeconds: 120, labelEn: 'Challenge', labelTa: 'சவால்' },
     ],
   },
   {
@@ -132,7 +138,7 @@ export const LEVEL_DEFINITIONS: LevelDefinition[] = [
     color: '#b83232',
     passThreshold: 75,
     phases: [
-      { type: 'arithmetic-add', questionCount: 8, passScore: 6, labelEn: 'Addition ×8', labelTa: 'கூட்டல் ×8' },
+      { type: 'arithmetic-add', questionCount: 8, passScore: 6, timeLimitSeconds: 240, labelEn: 'Addition ×8', labelTa: 'கூட்டல் ×8' },
     ],
   },
   {
@@ -145,7 +151,7 @@ export const LEVEL_DEFINITIONS: LevelDefinition[] = [
     color: '#c07828',
     passThreshold: 75,
     phases: [
-      { type: 'arithmetic-sub', questionCount: 8, passScore: 6, labelEn: 'Subtraction ×8', labelTa: 'கழித்தல் ×8' },
+      { type: 'arithmetic-sub', questionCount: 8, passScore: 6, timeLimitSeconds: 240, labelEn: 'Subtraction ×8', labelTa: 'கழித்தல் ×8' },
     ],
   },
   {
@@ -158,7 +164,7 @@ export const LEVEL_DEFINITIONS: LevelDefinition[] = [
     color: '#7b3fa0',
     passThreshold: 0,
     phases: [
-      { type: 'arithmetic-mixed', questionCount: 10, passScore: 0, labelEn: 'Grand Challenge ×10', labelTa: 'பெரும் சவால் ×10' },
+      { type: 'arithmetic-mixed', questionCount: 10, passScore: 0, timeLimitSeconds: 300, labelEn: 'Grand Challenge ×10', labelTa: 'பெரும் சவால் ×10' },
     ],
   },
 ];
