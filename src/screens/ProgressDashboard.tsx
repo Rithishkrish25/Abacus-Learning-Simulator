@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useProgressStore, ALL_BADGES } from '../store/useProgressStore';
 import { SOROBAN_BASICS_STEPS } from '../lessons/sorobanLearningSteps';
-import type { AppScreen } from '../App';
+import type { AppScreen } from '../types/app';
 
 interface ProgressDashboardProps {
   onNavigate: (screen: AppScreen) => void;

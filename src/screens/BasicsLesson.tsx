@@ -9,7 +9,7 @@ import { SOROBAN_BASICS_STEPS } from '../lessons/sorobanLearningSteps';
 import { useAbacusStore, rodDigit, sorobanValue } from '../store/useAbacusStore';
 import { useProgressStore, ALL_BADGES } from '../store/useProgressStore';
 import { RodIndex } from '../types/abacus';
-import type { AppScreen } from '../App';
+import type { AppScreen } from '../types/app';
 
 interface BasicsLessonProps {
   onNavigate: (screen: AppScreen) => void;

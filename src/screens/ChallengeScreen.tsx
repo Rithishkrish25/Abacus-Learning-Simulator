@@ -3,7 +3,7 @@ import { AbacusScene } from '../components/AbacusScene';
 import { PlaceValueOverlay } from '../components/PlaceValueOverlay';
 import { useAbacusStore, sorobanValue } from '../store/useAbacusStore';
 import { useProgressStore, ALL_BADGES } from '../store/useProgressStore';
-import type { AppScreen } from '../App';
+import type { AppScreen } from '../types/app';
 
 interface ChallengeScreenProps {
   onNavigate: (screen: AppScreen) => void;

@@ -1,5 +1,5 @@
 import { useProgressStore, ALL_BADGES } from '../store/useProgressStore';
-import type { AppScreen } from '../App';
+import type { AppScreen } from '../types/app';
 
 interface ModeSelectScreenProps {
   onNavigate: (screen: AppScreen) => void;

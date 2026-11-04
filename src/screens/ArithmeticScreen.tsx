@@ -8,7 +8,7 @@ import {
   stepIsComplete,
   type ArithmeticProblem,
 } from '../arithmetic/arithmeticEngine';
-import type { AppScreen } from '../App';
+import type { AppScreen } from '../types/app';
 
 interface ArithmeticScreenProps {
   onNavigate: (screen: AppScreen) => void;

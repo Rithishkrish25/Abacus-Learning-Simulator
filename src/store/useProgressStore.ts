@@ -1,8 +1,6 @@
 /**
- * Progress & Achievement Store
- * Tracks lesson completions, practice sessions, challenge results, and arithmetic sessions.
- * Persists to localStorage automatically on every change.
- * Handles safe migration from v2 to v3 format.
+ * Progress & Achievement Store — v4
+ * Unified 7-level progress tracking. Migrates safely from v3.
  */
 import { create } from 'zustand';
 
@@ -20,7 +18,12 @@ export interface ProgressState {
   lastActivityAt: number | null;
   arithmeticSessionsCompleted: number;
   arithmeticProblemsCorrect: number;
-  /** Schema version — used for migrations */
+  /** 0=locked, 1=available, 2=complete — one entry per level */
+  levelStatus: number[];
+  /** 0-based index of the currently active level */
+  currentLevelIndex: number;
+  /** Highest score (0–100) earned per level */
+  levelScores: number[];
   _version: number;
 }
 
@@ -39,83 +42,92 @@ export const ALL_BADGES: Badge[] = [
     id: 'first-lesson',
     emoji: '🎓',
     name: 'Soroban Student',
-    description: 'Finish the Soroban Basics lesson for the first time.',
-    condition: (s) => s.lessonsCompleted >= 1,
+    description: 'Complete Level 1.',
+    condition: (s) => (s.levelStatus[0] ?? 0) === 2,
   },
   {
     id: 'counting-star',
     emoji: '⭐',
     name: 'Counting Star',
-    description: 'Get 5 or more correct answers in Challenge mode.',
-    condition: (s) => s.challengeCorrectAnswers >= 5,
+    description: 'Complete Level 2.',
+    condition: (s) => (s.levelStatus[1] ?? 0) === 2,
   },
   {
     id: 'practice-champion',
     emoji: '🏅',
     name: 'Practice Champion',
-    description: 'Complete 5 Free Practice sessions.',
-    condition: (s) => s.practiceSessions >= 5,
+    description: 'Complete Level 4.',
+    condition: (s) => (s.levelStatus[3] ?? 0) === 2,
   },
   {
     id: 'abacus-master',
     emoji: '🏆',
     name: 'Soroban Master',
-    description: 'Complete a Challenge session with 8 or more correct answers.',
-    condition: (s) => s.bestSessionCorrect >= 8,
+    description: 'Complete all 7 levels.',
+    condition: (s) => s.levelStatus.filter((v) => v === 2).length === 7,
   },
   {
     id: 'big-number',
     emoji: '💯',
     name: 'Big Number',
-    description: 'Set a number larger than 999 in Free Practice.',
-    condition: (s) => s.practiceMaxNumber > 999,
+    description: 'Complete Level 4 (Place Values).',
+    condition: (s) => (s.levelStatus[3] ?? 0) === 2,
   },
   {
     id: 'arithmetic-ace',
     emoji: '➕',
     name: 'Arithmetic Ace',
-    description: 'Answer 10 arithmetic problems correctly.',
-    condition: (s) => s.arithmeticProblemsCorrect >= 10,
+    description: 'Complete Level 5 (Addition).',
+    condition: (s) => (s.levelStatus[4] ?? 0) === 2,
   },
 ];
 
-// ─── localStorage helpers ─────────────────────────────────────────────────────
+// ─── localStorage ─────────────────────────────────────────────────────────────
 
-const STORAGE_KEY     = 'soroban_progress_v3';
-const STORAGE_KEY_V2  = 'soroban_progress_v2';
+const STORAGE_KEY    = 'soroban_progress_v4';
+const STORAGE_KEY_V3 = 'soroban_progress_v3';
+
+const DEFAULT_LEVEL_STATUS: number[] = [1, 0, 0, 0, 0, 0, 0];
+const DEFAULT_LEVEL_SCORES: number[] = [0, 0, 0, 0, 0, 0, 0];
 
 function loadFromStorage(): ProgressState | null {
   try {
-    // 1. Try v3 key first
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as ProgressState;
 
-    // 2. Attempt migration from v2 key
-    const v2raw = localStorage.getItem(STORAGE_KEY_V2);
-    if (v2raw) {
-      const old = JSON.parse(v2raw) as Partial<ProgressState>;
+    const v3raw = localStorage.getItem(STORAGE_KEY_V3);
+    if (v3raw) {
+      const old = JSON.parse(v3raw) as Partial<ProgressState>;
+      const levelsCompleted = Math.min(
+        (old.lessonsCompleted ?? 0) > 0 ? 4 : 0,
+        7,
+      );
+      const levelStatus = DEFAULT_LEVEL_STATUS.map((_, i) =>
+        i < levelsCompleted ? 2 : i === levelsCompleted ? 1 : 0
+      );
       const migrated: ProgressState = {
-        lessonsCompleted: old.lessonsCompleted ?? 0,
-        practiceSessions: old.practiceSessions ?? 0,
-        practiceMaxNumber: old.practiceMaxNumber ?? 0,
-        challengeSessionsPlayed: old.challengeSessionsPlayed ?? 0,
+        lessonsCompleted:            old.lessonsCompleted            ?? 0,
+        practiceSessions:            old.practiceSessions            ?? 0,
+        practiceMaxNumber:           old.practiceMaxNumber           ?? 0,
+        challengeSessionsPlayed:     old.challengeSessionsPlayed     ?? 0,
         challengeQuestionsAttempted: old.challengeQuestionsAttempted ?? 0,
-        challengeCorrectAnswers: old.challengeCorrectAnswers ?? 0,
+        challengeCorrectAnswers:     old.challengeCorrectAnswers     ?? 0,
         unlockedBadges: (old.unlockedBadges ?? []).filter((id) =>
           ALL_BADGES.some((b) => b.id === id),
         ),
-        bestSessionCorrect: old.bestSessionCorrect ?? 0,
-        lastActivityAt: old.lastActivityAt ?? null,
-        arithmeticSessionsCompleted: 0,
-        arithmeticProblemsCorrect: 0,
-        _version: 3,
+        bestSessionCorrect:          old.bestSessionCorrect          ?? 0,
+        lastActivityAt:              old.lastActivityAt              ?? null,
+        arithmeticSessionsCompleted: old.arithmeticSessionsCompleted ?? 0,
+        arithmeticProblemsCorrect:   old.arithmeticProblemsCorrect   ?? 0,
+        levelStatus,
+        currentLevelIndex: Math.max(0, levelsCompleted - 1),
+        levelScores: [...DEFAULT_LEVEL_SCORES],
+        _version: 4,
       };
       saveToStorage(migrated);
-      localStorage.removeItem(STORAGE_KEY_V2);
       return migrated;
     }
 
-    // 3. Nothing found
     return null;
   } catch {
     return null;
@@ -126,7 +138,7 @@ function saveToStorage(state: ProgressState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Private browsing / quota — ignore silently
+    // quota / private browsing
   }
 }
 
@@ -144,16 +156,26 @@ const DEFAULT_STATE: ProgressState = {
   lastActivityAt: null,
   arithmeticSessionsCompleted: 0,
   arithmeticProblemsCorrect: 0,
-  _version: 3,
+  levelStatus: [...DEFAULT_LEVEL_STATUS],
+  currentLevelIndex: 0,
+  levelScores: [...DEFAULT_LEVEL_SCORES],
+  _version: 4,
 };
 
 function mergeWithDefaults(saved: Partial<ProgressState>): ProgressState {
-  return { ...DEFAULT_STATE, ...saved };
+  return {
+    ...DEFAULT_STATE,
+    ...saved,
+    levelStatus: saved.levelStatus?.length === 7 ? saved.levelStatus : [...DEFAULT_LEVEL_STATUS],
+    levelScores: saved.levelScores?.length === 7 ? saved.levelScores : [...DEFAULT_LEVEL_SCORES],
+  };
 }
 
-// ─── Store shape ──────────────────────────────────────────────────────────────
+// ─── Store interface ──────────────────────────────────────────────────────────
 
 interface ProgressStore extends ProgressState {
+  completeLevel: (levelIndex: number, score: number) => string[];
+  setCurrentLevel: (levelIndex: number) => void;
   recordLessonComplete: () => string[];
   recordPracticeSession: (maxNumber: number) => string[];
   recordChallengeResult: (attempted: number, correct: number) => string[];
@@ -176,8 +198,44 @@ function checkNewBadges(state: ProgressState): { newBadgeIds: string[]; updatedB
 
 const initialData = mergeWithDefaults(loadFromStorage() ?? {});
 
+// ─── Store ────────────────────────────────────────────────────────────────────
+
 export const useProgressStore = create<ProgressStore>((set, get) => ({
   ...initialData,
+
+  completeLevel: (levelIndex, score) => {
+    const current = get();
+    const newLevelStatus = [...current.levelStatus];
+    const newLevelScores = [...current.levelScores];
+
+    newLevelStatus[levelIndex] = 2;
+    newLevelScores[levelIndex] = Math.max(newLevelScores[levelIndex] ?? 0, score);
+
+    if (levelIndex + 1 < 7 && (newLevelStatus[levelIndex + 1] ?? 0) === 0) {
+      newLevelStatus[levelIndex + 1] = 1;
+    }
+
+    const next: ProgressState = {
+      ...current,
+      levelStatus: newLevelStatus,
+      levelScores: newLevelScores,
+      currentLevelIndex: Math.min(levelIndex + 1, 6),
+      lessonsCompleted: current.lessonsCompleted + (levelIndex < 4 ? 1 : 0),
+      lastActivityAt: Date.now(),
+    };
+    const { newBadgeIds, updatedBadges } = checkNewBadges(next);
+    next.unlockedBadges = updatedBadges;
+    saveToStorage(next);
+    set(next);
+    return newBadgeIds;
+  },
+
+  setCurrentLevel: (levelIndex) => {
+    const current = get();
+    const next = { ...current, currentLevelIndex: levelIndex };
+    saveToStorage(next);
+    set(next);
+  },
 
   recordLessonComplete: () => {
     const current = get();
@@ -193,7 +251,7 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
     return newBadgeIds;
   },
 
-  recordPracticeSession: (maxNumber: number) => {
+  recordPracticeSession: (maxNumber) => {
     const current = get();
     const next: ProgressState = {
       ...current,
@@ -208,7 +266,7 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
     return newBadgeIds;
   },
 
-  recordChallengeResult: (attempted: number, correct: number) => {
+  recordChallengeResult: (attempted, correct) => {
     const current = get();
     const next: ProgressState = {
       ...current,
@@ -225,7 +283,7 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
     return newBadgeIds;
   },
 
-  recordArithmeticSession: (problemsCorrect: number) => {
+  recordArithmeticSession: (problemsCorrect) => {
     const current = get();
     const clamped = Math.max(0, problemsCorrect);
     const next: ProgressState = {
