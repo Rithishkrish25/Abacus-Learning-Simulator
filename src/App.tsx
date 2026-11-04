@@ -4,10 +4,11 @@ import { BasicsLesson } from './screens/BasicsLesson';
 import { PracticeScreen } from './screens/PracticeScreen';
 import { ChallengeScreen } from './screens/ChallengeScreen';
 import { ProgressDashboard } from './screens/ProgressDashboard';
+import { ArithmeticScreen } from './screens/ArithmeticScreen';
 import { useAbacusStore } from './store/useAbacusStore';
 import './index.css';
 
-export type AppScreen = 'home' | 'basics' | 'practice' | 'challenge' | 'progress';
+export type AppScreen = 'home' | 'basics' | 'practice' | 'challenge' | 'progress' | 'arithmetic';
 
 function App() {
   const [screen, setScreen] = useState<AppScreen>('home');
@@ -45,6 +46,14 @@ function App() {
     return (
       <main className="app-root">
         <ChallengeScreen onNavigate={handleNavigate} />
+      </main>
+    );
+  }
+
+  if (screen === 'arithmetic') {
+    return (
+      <main className="app-root">
+        <ArithmeticScreen onNavigate={handleNavigate} />
       </main>
     );
   }

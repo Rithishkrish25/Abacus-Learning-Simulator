@@ -1,31 +1,27 @@
 /**
  * Progress & Achievement Store
- * Tracks lesson completions, practice sessions, and challenge results.
+ * Tracks lesson completions, practice sessions, challenge results, and arithmetic sessions.
  * Persists to localStorage automatically on every change.
+ * Handles safe migration from v2 to v3 format.
  */
 import { create } from 'zustand';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ProgressState {
-  /** How many times the Basics lesson has been completed */
   lessonsCompleted: number;
-  /** Total Free Practice sessions started */
   practiceSessions: number;
-  /** Highest single number set in Free Practice */
   practiceMaxNumber: number;
-  /** Total Challenge sessions finished */
   challengeSessionsPlayed: number;
-  /** Total questions attempted across all Challenge sessions */
   challengeQuestionsAttempted: number;
-  /** Total correct answers across all Challenge sessions */
   challengeCorrectAnswers: number;
-  /** Badges already unlocked (badge IDs) */
   unlockedBadges: string[];
-  /** Best correct-answer count in a single Challenge session */
   bestSessionCorrect: number;
-  /** Timestamp (ms) of last activity */
   lastActivityAt: number | null;
+  arithmeticSessionsCompleted: number;
+  arithmeticProblemsCorrect: number;
+  /** Schema version — used for migrations */
+  _version: number;
 }
 
 export interface Badge {
@@ -33,7 +29,6 @@ export interface Badge {
   emoji: string;
   name: string;
   description: string;
-  /** Returns true when the badge should be awarded given the current state */
   condition: (s: ProgressState) => boolean;
 }
 
@@ -43,8 +38,8 @@ export const ALL_BADGES: Badge[] = [
   {
     id: 'first-lesson',
     emoji: '🎓',
-    name: 'First Lesson',
-    description: 'Finish the Abacus Basics lesson for the first time.',
+    name: 'Soroban Student',
+    description: 'Finish the Soroban Basics lesson for the first time.',
     condition: (s) => s.lessonsCompleted >= 1,
   },
   {
@@ -64,22 +59,64 @@ export const ALL_BADGES: Badge[] = [
   {
     id: 'abacus-master',
     emoji: '🏆',
-    name: 'Abacus Master',
-    description: 'Complete a full Challenge with 8 or more correct answers.',
-    // Checked immediately after a session — bestSessionCorrect tracks the per-session peak
+    name: 'Soroban Master',
+    description: 'Complete a Challenge session with 8 or more correct answers.',
     condition: (s) => s.bestSessionCorrect >= 8,
+  },
+  {
+    id: 'big-number',
+    emoji: '💯',
+    name: 'Big Number',
+    description: 'Set a number larger than 999 in Free Practice.',
+    condition: (s) => s.practiceMaxNumber > 999,
+  },
+  {
+    id: 'arithmetic-ace',
+    emoji: '➕',
+    name: 'Arithmetic Ace',
+    description: 'Answer 10 arithmetic problems correctly.',
+    condition: (s) => s.arithmeticProblemsCorrect >= 10,
   },
 ];
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'abacus_progress_v1';
+const STORAGE_KEY     = 'soroban_progress_v3';
+const STORAGE_KEY_V2  = 'soroban_progress_v2';
 
 function loadFromStorage(): ProgressState | null {
   try {
+    // 1. Try v3 key first
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as ProgressState;
+    if (raw) return JSON.parse(raw) as ProgressState;
+
+    // 2. Attempt migration from v2 key
+    const v2raw = localStorage.getItem(STORAGE_KEY_V2);
+    if (v2raw) {
+      const old = JSON.parse(v2raw) as Partial<ProgressState>;
+      const migrated: ProgressState = {
+        lessonsCompleted: old.lessonsCompleted ?? 0,
+        practiceSessions: old.practiceSessions ?? 0,
+        practiceMaxNumber: old.practiceMaxNumber ?? 0,
+        challengeSessionsPlayed: old.challengeSessionsPlayed ?? 0,
+        challengeQuestionsAttempted: old.challengeQuestionsAttempted ?? 0,
+        challengeCorrectAnswers: old.challengeCorrectAnswers ?? 0,
+        unlockedBadges: (old.unlockedBadges ?? []).filter((id) =>
+          ALL_BADGES.some((b) => b.id === id),
+        ),
+        bestSessionCorrect: old.bestSessionCorrect ?? 0,
+        lastActivityAt: old.lastActivityAt ?? null,
+        arithmeticSessionsCompleted: 0,
+        arithmeticProblemsCorrect: 0,
+        _version: 3,
+      };
+      saveToStorage(migrated);
+      localStorage.removeItem(STORAGE_KEY_V2);
+      return migrated;
+    }
+
+    // 3. Nothing found
+    return null;
   } catch {
     return null;
   }
@@ -89,7 +126,7 @@ function saveToStorage(state: ProgressState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Silently ignore storage errors (private browsing, quota exceeded, etc.)
+    // Private browsing / quota — ignore silently
   }
 }
 
@@ -105,6 +142,9 @@ const DEFAULT_STATE: ProgressState = {
   bestSessionCorrect: 0,
   unlockedBadges: [],
   lastActivityAt: null,
+  arithmeticSessionsCompleted: 0,
+  arithmeticProblemsCorrect: 0,
+  _version: 3,
 };
 
 function mergeWithDefaults(saved: Partial<ProgressState>): ProgressState {
@@ -114,21 +154,16 @@ function mergeWithDefaults(saved: Partial<ProgressState>): ProgressState {
 // ─── Store shape ──────────────────────────────────────────────────────────────
 
 interface ProgressStore extends ProgressState {
-  /** Called when the Basics lesson completes */
   recordLessonComplete: () => string[];
-  /** Called when a Free Practice session starts */
   recordPracticeSession: (maxNumber: number) => string[];
-  /** Called when a full Challenge session ends */
   recordChallengeResult: (attempted: number, correct: number) => string[];
-  /** Wipe all progress (after user confirms) */
+  recordArithmeticSession: (problemsCorrect: number) => string[];
   resetProgress: () => void;
-  /** Derived: accuracy percentage (0–100, integer) */
   accuracyPercent: () => number;
 }
 
-// ─── Store ────────────────────────────────────────────────────────────────────
+// ─── Badge checker ────────────────────────────────────────────────────────────
 
-/** Check which new badges are earned and return their IDs */
 function checkNewBadges(state: ProgressState): { newBadgeIds: string[]; updatedBadges: string[] } {
   const newBadgeIds: string[] = [];
   for (const badge of ALL_BADGES) {
@@ -136,8 +171,7 @@ function checkNewBadges(state: ProgressState): { newBadgeIds: string[]; updatedB
       newBadgeIds.push(badge.id);
     }
   }
-  const updatedBadges = [...state.unlockedBadges, ...newBadgeIds];
-  return { newBadgeIds, updatedBadges };
+  return { newBadgeIds, updatedBadges: [...state.unlockedBadges, ...newBadgeIds] };
 }
 
 const initialData = mergeWithDefaults(loadFromStorage() ?? {});
@@ -182,6 +216,22 @@ export const useProgressStore = create<ProgressStore>((set, get) => ({
       challengeQuestionsAttempted: current.challengeQuestionsAttempted + attempted,
       challengeCorrectAnswers: current.challengeCorrectAnswers + correct,
       bestSessionCorrect: Math.max(current.bestSessionCorrect, correct),
+      lastActivityAt: Date.now(),
+    };
+    const { newBadgeIds, updatedBadges } = checkNewBadges(next);
+    next.unlockedBadges = updatedBadges;
+    saveToStorage(next);
+    set(next);
+    return newBadgeIds;
+  },
+
+  recordArithmeticSession: (problemsCorrect: number) => {
+    const current = get();
+    const clamped = Math.max(0, problemsCorrect);
+    const next: ProgressState = {
+      ...current,
+      arithmeticSessionsCompleted: current.arithmeticSessionsCompleted + 1,
+      arithmeticProblemsCorrect: current.arithmeticProblemsCorrect + clamped,
       lastActivityAt: Date.now(),
     };
     const { newBadgeIds, updatedBadges } = checkNewBadges(next);

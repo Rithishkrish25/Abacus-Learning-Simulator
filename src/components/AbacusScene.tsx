@@ -7,7 +7,7 @@ import {
 import { Suspense, useRef, useState, useCallback, useMemo } from 'react';
 import { ACESFilmicToneMapping } from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { AbacusFrame, getRodYPositions } from './AbacusFrame';
+import { AbacusFrame, getRodXPositions } from './AbacusFrame';
 import { AbacusRod } from './AbacusRod';
 import { StudioEnvironment } from './StudioEnvironment';
 import { ResponsiveCamera } from './ResponsiveCamera';
@@ -15,17 +15,30 @@ import { useAbacusStore } from '../store/useAbacusStore';
 import { DragContext } from '../hooks/useDragContext';
 import { BeadColour } from '../types/abacus';
 
+// Earth bead colours — one per rod (Ten-Thousands → Ones)
 const BEAD_PALETTE: BeadColour[] = [
-  { colour: '#b83232', roughness: 0.30, metalness: 0.0 },
-  { colour: '#c07828', roughness: 0.32, metalness: 0.0 },
-  { colour: '#3a7d44', roughness: 0.30, metalness: 0.0 },
-  { colour: '#2e6fa0', roughness: 0.30, metalness: 0.0 },
-  { colour: '#7b3fa0', roughness: 0.30, metalness: 0.0 },
+  { colour: '#b83232', roughness: 0.30, metalness: 0.0 },  // red
+  { colour: '#c07828', roughness: 0.32, metalness: 0.0 },  // orange
+  { colour: '#3a7d44', roughness: 0.30, metalness: 0.0 },  // green
+  { colour: '#2e6fa0', roughness: 0.30, metalness: 0.0 },  // blue
+  { colour: '#7b3fa0', roughness: 0.30, metalness: 0.0 },  // purple
 ];
 
-export function AbacusScene() {
+// Heaven bead — creamy white/ivory across all rods
+const HEAVEN_COLOUR: BeadColour = {
+  colour: '#e8dcc8',
+  roughness: 0.28,
+  metalness: 0.0,
+};
+
+interface AbacusSceneProps {
+  /** Rod indices to highlight (lesson mode) */
+  highlightRods?: number[];
+}
+
+export function AbacusScene({ highlightRods = [] }: AbacusSceneProps) {
   const rods = useAbacusStore((s) => s.rods);
-  const rodYPositions = getRodYPositions();
+  const rodXPositions = getRodXPositions();
   const orbitRef = useRef<OrbitControlsImpl>(null);
   const [anyDragging, setAnyDragging] = useState(false);
 
@@ -41,8 +54,7 @@ export function AbacusScene() {
       <DragContext.Provider value={dragContextValue}>
         <Canvas
           shadows="soft"
-          // Initial camera — ResponsiveCamera adjusts it reactively on resize
-          camera={{ position: [1.5, 2.2, 9.5], fov: 34, near: 0.1, far: 120 }}
+          camera={{ position: [0, 0.5, 11.5], fov: 34, near: 0.1, far: 120 }}
           gl={{
             antialias: true,
             toneMapping: ACESFilmicToneMapping,
@@ -53,7 +65,6 @@ export function AbacusScene() {
             gl.domElement.style.touchAction = 'none';
           }}
         >
-          {/* ── Responsive camera controller (must be inside Canvas) ── */}
           <ResponsiveCamera />
 
           <Suspense fallback={null}>
@@ -74,21 +85,24 @@ export function AbacusScene() {
 
             <StudioEnvironment />
 
-            <group position={[0, 0.1, 0]} rotation={[-0.06, 0.04, 0]}>
+            <group position={[0, 0.1, 0]} rotation={[-0.04, 0.02, 0]}>
               <AbacusFrame />
               {rods.map((rod, i) => (
                 <AbacusRod
                   key={rod.rodIndex}
                   rodIndex={rod.rodIndex}
-                  positionY={rodYPositions[i] ?? 0}
-                  activeCount={rod.activeCount}
+                  positionX={rodXPositions[i] ?? 0}
+                  heavenActive={rod.heavenActive}
+                  earthActive={rod.earthActive}
                   beadColour={BEAD_PALETTE[i % BEAD_PALETTE.length] ?? BEAD_PALETTE[0]!}
+                  heavenColour={HEAVEN_COLOUR}
+                  highlighted={highlightRods.includes(i)}
                 />
               ))}
             </group>
 
-            <ContactShadows position={[0, -3.04, 0]} opacity={0.62} scale={22} blur={1.8} far={4} color="#3a2510" />
-            <ContactShadows position={[0, -3.04, 0]} opacity={0.22} scale={30} blur={5.5} far={6} color="#2a1a08" />
+            <ContactShadows position={[0, -3.5, 0]} opacity={0.62} scale={22} blur={1.8} far={4} color="#3a2510" />
+            <ContactShadows position={[0, -3.5, 0]} opacity={0.22} scale={30} blur={5.5} far={6} color="#2a1a08" />
           </Suspense>
 
           <OrbitControls
@@ -98,8 +112,8 @@ export function AbacusScene() {
             enableZoom={true}
             enableDamping={true}
             dampingFactor={0.07}
-            minDistance={5}
-            maxDistance={18}
+            minDistance={6}
+            maxDistance={20}
             minPolarAngle={Math.PI / 8}
             maxPolarAngle={Math.PI / 2.1}
             minAzimuthAngle={-Math.PI / 2.5}

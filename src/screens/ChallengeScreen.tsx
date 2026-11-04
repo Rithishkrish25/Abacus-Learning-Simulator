@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AbacusScene } from '../components/AbacusScene';
-import { useAbacusStore, totalActive } from '../store/useAbacusStore';
+import { PlaceValueOverlay } from '../components/PlaceValueOverlay';
+import { useAbacusStore, sorobanValue } from '../store/useAbacusStore';
 import { useProgressStore, ALL_BADGES } from '../store/useProgressStore';
 import type { AppScreen } from '../App';
 
@@ -8,26 +9,38 @@ interface ChallengeScreenProps {
   onNavigate: (screen: AppScreen) => void;
 }
 
-// ─── Challenge constants ──────────────────────────────────────────────────────
-const TOTAL_QUESTIONS = 10;
+const TOTAL_QUESTIONS  = 10;
 const POINTS_PER_CORRECT = 10;
 const MIN_NUMBER = 1;
-const MAX_NUMBER = 50;
+const MAX_NUMBER = 99999;
+
+// Difficulty tiers based on session count
+function getMaxForSession(sessionsPlayed: number): number {
+  if (sessionsPlayed < 2)  return 9;       // digits only
+  if (sessionsPlayed < 5)  return 99;      // two digits
+  if (sessionsPlayed < 10) return 999;     // three digits
+  return MAX_NUMBER;
+}
 
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function generateQuestions(count: number): number[] {
-  const pool = Array.from(
-    { length: MAX_NUMBER - MIN_NUMBER + 1 },
-    (_, i) => i + MIN_NUMBER,
-  );
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = randomInt(0, i);
-    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+function generateQuestions(count: number, maxN: number): number[] {
+  const pool: number[] = [];
+  const seen = new Set<number>();
+  while (pool.length < count) {
+    const n = randomInt(min(MIN_NUMBER, maxN), maxN);
+    if (!seen.has(n)) {
+      pool.push(n);
+      seen.add(n);
+    }
   }
-  return pool.slice(0, count);
+  return pool;
+}
+
+function min(a: number, b: number): number {
+  return a < b ? a : b;
 }
 
 type AnswerState = 'pending' | 'correct' | 'incorrect';
@@ -44,22 +57,25 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
   const undo    = useAbacusStore((s) => s.undo);
   const history = useAbacusStore((s) => s.history);
 
-  const total   = totalActive(rods);
+  const total   = sorobanValue(rods);
   const canUndo = history.length > 0;
 
-  const recordChallengeResult = useProgressStore((s) => s.recordChallengeResult);
+  const recordChallengeResult  = useProgressStore((s) => s.recordChallengeResult);
+  const sessionsPlayed         = useProgressStore((s) => s.challengeSessionsPlayed);
 
-  const questions = useRef<number[]>(generateQuestions(TOTAL_QUESTIONS));
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [answerState, setAnswerState] = useState<AnswerState>('pending');
-  const [results, setResults] = useState<QuestionResult[]>([]);
-  const [done, setDone] = useState(false);
+  const maxN = getMaxForSession(sessionsPlayed);
+  const questions = useRef<number[]>(generateQuestions(TOTAL_QUESTIONS, maxN));
+
+  const [questionIndex,        setQuestionIndex]        = useState(0);
+  const [answerState,          setAnswerState]          = useState<AnswerState>('pending');
+  const [results,              setResults]              = useState<QuestionResult[]>([]);
+  const [done,                 setDone]                 = useState(false);
   const [studentAnswerAtSubmit, setStudentAnswerAtSubmit] = useState(0);
-  const [newBadgeIds, setNewBadgeIds] = useState<string[]>([]);
+  const [newBadgeIds,          setNewBadgeIds]          = useState<string[]>([]);
 
-  const currentTarget = questions.current[questionIndex] ?? 1;
-  const score = results.filter((r) => r.correct).length * POINTS_PER_CORRECT;
-  const correctCount = results.filter((r) => r.correct).length;
+  const currentTarget   = questions.current[questionIndex] ?? 1;
+  const score           = results.filter((r) => r.correct).length * POINTS_PER_CORRECT;
+  const correctCount    = results.filter((r) => r.correct).length;
 
   useEffect(() => {
     reset();
@@ -72,10 +88,7 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
     const correct = total === currentTarget;
     setStudentAnswerAtSubmit(total);
     setAnswerState(correct ? 'correct' : 'incorrect');
-    setResults((prev) => [
-      ...prev,
-      { target: currentTarget, studentAnswer: total, correct },
-    ]);
+    setResults((prev) => [...prev, { target: currentTarget, studentAnswer: total, correct }]);
   }, [answerState, total, currentTarget]);
 
   const handleNext = useCallback(() => {
@@ -86,16 +99,16 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
     }
   }, [questionIndex]);
 
-  // Record results when session finishes (done becomes true)
   useEffect(() => {
     if (!done || results.length === 0) return;
     const correct = results.filter((r) => r.correct).length;
-    const earned = recordChallengeResult(results.length, correct);
+    const earned  = recordChallengeResult(results.length, correct);
     setNewBadgeIds(earned);
   }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePlayAgain = useCallback(() => {
-    questions.current = generateQuestions(TOTAL_QUESTIONS);
+    const newMax = getMaxForSession(sessionsPlayed + 1);
+    questions.current = generateQuestions(TOTAL_QUESTIONS, newMax);
     setQuestionIndex(0);
     setAnswerState('pending');
     setResults([]);
@@ -103,7 +116,7 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
     setStudentAnswerAtSubmit(0);
     setNewBadgeIds([]);
     reset();
-  }, [reset]);
+  }, [reset, sessionsPlayed]);
 
   const handleBack = useCallback(() => {
     reset();
@@ -115,8 +128,7 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
   const feedbackText = (() => {
     if (answerState === 'correct') return '🎉 Correct! Well done!';
     if (answerState === 'incorrect') {
-      if (studentAnswerAtSubmit === currentTarget) return '';
-      return `Almost! You had ${studentAnswerAtSubmit}. The answer was ${currentTarget}.`;
+      return `Not quite! You had ${studentAnswerAtSubmit}. The answer was ${currentTarget}.`;
     }
     return '';
   })();
@@ -124,14 +136,14 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
   const liveHint = (() => {
     if (answerState !== 'pending') return '';
     if (diff === 0) return '✓ Ready to submit!';
-    if (diff < 0) return `Add ${-diff} more bead${-diff !== 1 ? 's' : ''}`;
-    return `Remove ${diff} bead${diff !== 1 ? 's' : ''}`;
+    if (diff < 0)   return `Need ${-diff} more`;
+    return `Over by ${diff}`;
   })();
 
-  // ── Final results screen ──────────────────────────────────────────────────
+  // ── Results screen ─────────────────────────────────────────────────────────
   if (done) {
     const perfect = correctCount === TOTAL_QUESTIONS;
-    const good = correctCount >= 7;
+    const good    = correctCount >= 7;
     return (
       <div className="challenge-results-root">
         <div className="challenge-results-card">
@@ -166,24 +178,15 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
           </div>
 
           <div className="challenge-results-actions">
-            <button
-              className="challenge-btn challenge-btn--primary"
-              onClick={handlePlayAgain}
-              aria-label="Play again"
-            >
+            <button className="challenge-btn challenge-btn--primary" onClick={handlePlayAgain} aria-label="Play again">
               🔄 Play Again
             </button>
-            <button
-              className="challenge-btn challenge-btn--secondary"
-              onClick={handleBack}
-              aria-label="Back to main menu"
-            >
+            <button className="challenge-btn challenge-btn--secondary" onClick={handleBack} aria-label="Back to menu">
               🏠 Menu
             </button>
           </div>
         </div>
 
-        {/* Badge toast notifications */}
         {newBadgeIds.length > 0 && (
           <div className="badge-toast-stack" aria-live="polite">
             {newBadgeIds.map((id) => {
@@ -205,56 +208,39 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
     );
   }
 
-  // ── Main challenge screen ─────────────────────────────────────────────────
+  // ── Main challenge screen ──────────────────────────────────────────────────
   return (
     <div className="practice-root">
       <AbacusScene />
+      <PlaceValueOverlay />
 
       <div className="practice-hud" aria-label="Challenge controls">
-
-        {/* Top bar */}
         <div className="practice-top-bar">
-          <button
-            className="practice-back-btn"
-            onClick={handleBack}
-            aria-label="Back to main menu"
-          >
-            ← Menu
-          </button>
+          <button className="practice-back-btn" onClick={handleBack} aria-label="Back to menu">← Menu</button>
           <span className="practice-screen-label">⭐ Challenge</span>
           <div className="challenge-progress-pill" aria-label={`Question ${questionIndex + 1} of ${TOTAL_QUESTIONS}`}>
             Q{questionIndex + 1}/{TOTAL_QUESTIONS}
           </div>
-          <div className="challenge-score-pill" aria-label={`Score: ${score} points`}>
-            ⭐ {score}
-          </div>
+          <div className="challenge-score-pill" aria-label={`Score: ${score}`}>⭐ {score}</div>
         </div>
 
         <div className="practice-mid-spacer" />
 
-        {/* Bottom panel */}
         <div className="practice-bottom-panel">
-
           <div className="practice-info-row">
             <div className={`challenge-target-box${answerState === 'correct' ? ' challenge-target-box--correct' : answerState === 'incorrect' ? ' challenge-target-box--wrong' : ''}`}>
               <span className="challenge-target-label">Show this number:</span>
-              <span className="challenge-target-number" aria-label={`Target: ${currentTarget}`}>
-                {currentTarget}
-              </span>
+              <span className="challenge-target-number" aria-label={`Target: ${currentTarget}`}>{currentTarget}</span>
             </div>
 
             <div className={`practice-total${answerState === 'correct' ? ' practice-total--matched' : ''}`}>
-              <span className="practice-total-label">You have</span>
+              <span className="practice-total-label">Soroban shows</span>
               <span className="practice-total-number">{total}</span>
-              <span className="practice-total-label">beads</span>
             </div>
           </div>
 
           {answerState === 'pending' && liveHint && (
-            <div
-              className={`challenge-hint${diff === 0 ? ' challenge-hint--ready' : ''}`}
-              aria-live="polite"
-            >
+            <div className={`challenge-hint${diff === 0 ? ' challenge-hint--ready' : ''}`} aria-live="polite">
               {liveHint}
             </div>
           )}
@@ -268,31 +254,21 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
           )}
 
           <div className="practice-btn-row">
-            <button
-              className="practice-btn practice-btn--secondary"
-              onClick={reset}
-              aria-label="Reset all beads to zero"
-            >
-              🔄 Reset
-            </button>
+            <button className="practice-btn practice-btn--secondary" onClick={reset} aria-label="Reset">🔄 Reset</button>
 
             {answerState === 'pending' && (
               <button
                 className={`practice-btn practice-btn--secondary${!canUndo ? ' practice-btn--disabled' : ''}`}
                 onClick={undo}
                 disabled={!canUndo}
-                aria-label="Undo last move"
+                aria-label="Undo"
               >
                 ↩ Undo
               </button>
             )}
 
             {answerState === 'pending' && (
-              <button
-                className="practice-btn challenge-btn--submit"
-                onClick={handleSubmit}
-                aria-label="Submit your answer"
-              >
+              <button className="practice-btn challenge-btn--submit" onClick={handleSubmit} aria-label="Submit answer">
                 ✓ Submit
               </button>
             )}
@@ -307,7 +283,6 @@ export function ChallengeScreen({ onNavigate }: ChallengeScreenProps) {
               </button>
             )}
           </div>
-
         </div>
       </div>
     </div>

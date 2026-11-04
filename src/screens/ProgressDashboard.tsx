@@ -1,62 +1,45 @@
 import { useState, useCallback } from 'react';
 import { useProgressStore, ALL_BADGES } from '../store/useProgressStore';
-import { ABACUS_BASICS_STEPS } from '../lessons/abacusBasicsSteps';
-
-type AppScreen = 'home' | 'basics' | 'practice' | 'challenge' | 'progress';
+import { SOROBAN_BASICS_STEPS } from '../lessons/sorobanLearningSteps';
+import type { AppScreen } from '../App';
 
 interface ProgressDashboardProps {
   onNavigate: (screen: AppScreen) => void;
 }
 
-const TOTAL_LESSON_STEPS = ABACUS_BASICS_STEPS.length;
+const TOTAL_LESSON_STEPS = SOROBAN_BASICS_STEPS.length;
 
 export function ProgressDashboard({ onNavigate }: ProgressDashboardProps) {
-  const store = useProgressStore();
+  const store    = useProgressStore();
   const accuracy = store.accuracyPercent();
 
   const [confirmReset, setConfirmReset] = useState(false);
 
-  const handleResetClick = useCallback(() => setConfirmReset(true), []);
-  const handleResetCancel = useCallback(() => setConfirmReset(false), []);
+  const handleResetClick   = useCallback(() => setConfirmReset(true), []);
+  const handleResetCancel  = useCallback(() => setConfirmReset(false), []);
   const handleResetConfirm = useCallback(() => {
     store.resetProgress();
     setConfirmReset(false);
   }, [store]);
 
-  // Stars for lesson (1 star per completion, max 3 shown)
-  const lessonStars = Math.min(store.lessonsCompleted, 3);
-
-  // Stars for challenge accuracy
-  const challengeStars =
-    store.challengeQuestionsAttempted === 0
-      ? 0
-      : accuracy >= 80
-      ? 3
-      : accuracy >= 50
-      ? 2
-      : 1;
+  const lessonStars    = Math.min(store.lessonsCompleted, 3);
+  const challengeStars = store.challengeQuestionsAttempted === 0 ? 0 : accuracy >= 80 ? 3 : accuracy >= 50 ? 2 : 1;
 
   return (
     <div className="progress-root">
-      {/* ── Top bar ── */}
       <div className="progress-top-bar">
-        <button
-          className="practice-back-btn"
-          onClick={() => onNavigate('home')}
-          aria-label="Back to main menu"
-        >
+        <button className="practice-back-btn" onClick={() => onNavigate('home')} aria-label="Back to main menu">
           ← Menu
         </button>
         <span className="progress-title">📊 My Progress</span>
         <div className="practice-top-spacer" />
       </div>
 
-      {/* ── Scrollable body ── */}
       <div className="progress-body">
 
-        {/* ══ Section: Lesson ══ */}
+        {/* ── Soroban Basics ── */}
         <section className="progress-section" aria-label="Lesson progress">
-          <h2 className="progress-section-title">🧮 Abacus Basics</h2>
+          <h2 className="progress-section-title">🧮 Soroban Basics</h2>
           <div className="progress-stat-row">
             <div className="progress-stat-box">
               <span className="progress-stat-number">{store.lessonsCompleted}</span>
@@ -69,24 +52,18 @@ export function ProgressDashboard({ onNavigate }: ProgressDashboardProps) {
             <div className="progress-stat-box">
               <div className="progress-stars" aria-label={`${lessonStars} out of 3 stars`}>
                 {[1, 2, 3].map((n) => (
-                  <span
-                    key={n}
-                    className={`progress-star${n <= lessonStars ? ' progress-star--lit' : ''}`}
-                    aria-hidden="true"
-                  >
-                    ⭐
-                  </span>
+                  <span key={n} className={`progress-star${n <= lessonStars ? ' progress-star--lit' : ''}`} aria-hidden="true">⭐</span>
                 ))}
               </div>
-              <span className="progress-stat-label">Stars Earned</span>
+              <span className="progress-stat-label">Stars</span>
             </div>
           </div>
           {store.lessonsCompleted === 0 && (
-            <p className="progress-hint">Start the lesson to earn your first star! 🌟</p>
+            <p className="progress-hint">Complete the Soroban Basics lesson to earn your first star! 🌟</p>
           )}
         </section>
 
-        {/* ══ Section: Practice ══ */}
+        {/* ── Free Practice ── */}
         <section className="progress-section" aria-label="Practice progress">
           <h2 className="progress-section-title">🎯 Free Practice</h2>
           <div className="progress-stat-row">
@@ -96,17 +73,17 @@ export function ProgressDashboard({ onNavigate }: ProgressDashboardProps) {
             </div>
             <div className="progress-stat-box">
               <span className="progress-stat-number">
-                {store.practiceMaxNumber > 0 ? store.practiceMaxNumber : '–'}
+                {store.practiceMaxNumber > 0 ? store.practiceMaxNumber.toLocaleString() : '–'}
               </span>
               <span className="progress-stat-label">Highest Number</span>
             </div>
           </div>
           {store.practiceSessions === 0 && (
-            <p className="progress-hint">Try Free Practice to build your skills! 🎯</p>
+            <p className="progress-hint">Try Free Practice to build your Soroban skills! 🎯</p>
           )}
         </section>
 
-        {/* ══ Section: Challenge ══ */}
+        {/* ── Challenge ── */}
         <section className="progress-section" aria-label="Challenge progress">
           <h2 className="progress-section-title">⭐ Challenge Mode</h2>
           <div className="progress-stat-row">
@@ -126,7 +103,6 @@ export function ProgressDashboard({ onNavigate }: ProgressDashboardProps) {
             </div>
           </div>
 
-          {/* Accuracy bar */}
           {store.challengeQuestionsAttempted > 0 && (
             <div className="progress-bar-wrap" aria-label={`Accuracy: ${accuracy}%`}>
               <div
@@ -140,18 +116,11 @@ export function ProgressDashboard({ onNavigate }: ProgressDashboardProps) {
             </div>
           )}
 
-          {/* Challenge stars */}
           {store.challengeQuestionsAttempted > 0 && (
             <div className="progress-stars-row">
-              <div className="progress-stars" aria-label={`${challengeStars} out of 3 stars`}>
+              <div className="progress-stars" aria-label={`${challengeStars} of 3 stars`}>
                 {[1, 2, 3].map((n) => (
-                  <span
-                    key={n}
-                    className={`progress-star progress-star--lg${n <= challengeStars ? ' progress-star--lit' : ''}`}
-                    aria-hidden="true"
-                  >
-                    ⭐
-                  </span>
+                  <span key={n} className={`progress-star progress-star--lg${n <= challengeStars ? ' progress-star--lit' : ''}`} aria-hidden="true">⭐</span>
                 ))}
               </div>
               <span className="progress-stars-label">
@@ -165,7 +134,25 @@ export function ProgressDashboard({ onNavigate }: ProgressDashboardProps) {
           )}
         </section>
 
-        {/* ══ Section: Badges ══ */}
+        {/* ── Arithmetic ── */}
+        <section className="progress-section" aria-label="Arithmetic progress">
+          <h2 className="progress-section-title">➕ Arithmetic Mode</h2>
+          <div className="progress-stat-row">
+            <div className="progress-stat-box">
+              <span className="progress-stat-number">{store.arithmeticSessionsCompleted}</span>
+              <span className="progress-stat-label">Sessions</span>
+            </div>
+            <div className="progress-stat-box">
+              <span className="progress-stat-number">{store.arithmeticProblemsCorrect}</span>
+              <span className="progress-stat-label">Problems Correct</span>
+            </div>
+          </div>
+          {store.arithmeticSessionsCompleted === 0 && (
+            <p className="progress-hint">Try Arithmetic mode to practice addition and subtraction! ➕</p>
+          )}
+        </section>
+
+        {/* ── Badges ── */}
         <section className="progress-section" aria-label="Achievement badges">
           <h2 className="progress-section-title">🏅 My Badges</h2>
           <div className="progress-badges-grid">
@@ -177,9 +164,7 @@ export function ProgressDashboard({ onNavigate }: ProgressDashboardProps) {
                   className={`progress-badge${unlocked ? ' progress-badge--unlocked' : ' progress-badge--locked'}`}
                   aria-label={unlocked ? `${badge.name}: earned` : `${badge.name}: not yet earned`}
                 >
-                  <span className="progress-badge-emoji" aria-hidden="true">
-                    {unlocked ? badge.emoji : '🔒'}
-                  </span>
+                  <span className="progress-badge-emoji" aria-hidden="true">{unlocked ? badge.emoji : '🔒'}</span>
                   <span className="progress-badge-name">{badge.name}</span>
                   <span className="progress-badge-desc">{badge.description}</span>
                 </div>
@@ -188,36 +173,18 @@ export function ProgressDashboard({ onNavigate }: ProgressDashboardProps) {
           </div>
         </section>
 
-        {/* ══ Reset progress ══ */}
+        {/* ── Reset ── */}
         <section className="progress-section progress-section--reset" aria-label="Reset progress">
           {!confirmReset ? (
-            <button
-              className="progress-reset-btn"
-              onClick={handleResetClick}
-              aria-label="Reset all progress"
-            >
+            <button className="progress-reset-btn" onClick={handleResetClick} aria-label="Reset all progress">
               🗑️ Reset My Progress
             </button>
           ) : (
             <div className="progress-reset-confirm" role="alertdialog" aria-label="Confirm reset">
-              <p className="progress-reset-warning">
-                ⚠️ This will delete ALL your progress and badges. Are you sure?
-              </p>
+              <p className="progress-reset-warning">⚠️ This will delete ALL your progress and badges. Are you sure?</p>
               <div className="progress-reset-actions">
-                <button
-                  className="progress-reset-yes"
-                  onClick={handleResetConfirm}
-                  aria-label="Yes, reset everything"
-                >
-                  Yes, reset
-                </button>
-                <button
-                  className="progress-reset-no"
-                  onClick={handleResetCancel}
-                  aria-label="No, keep my progress"
-                >
-                  No, keep it
-                </button>
+                <button className="progress-reset-yes" onClick={handleResetConfirm} aria-label="Yes, reset">Yes, reset</button>
+                <button className="progress-reset-no"  onClick={handleResetCancel}  aria-label="No, keep">No, keep it</button>
               </div>
             </div>
           )}

@@ -6,3 +6,6 @@ dist/
 .DS_Store
 *.log
 .vscode/
+
+# Kiro local configuration
+.kiro/

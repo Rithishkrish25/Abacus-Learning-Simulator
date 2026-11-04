@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { LessonStep } from '../lessons/abacusBasicsSteps';
-import { useAbacusStore } from '../store/useAbacusStore';
+import type { LessonStep } from '../lessons/sorobanLearningSteps';
+import { useAbacusStore, rodDigit, sorobanValue } from '../store/useAbacusStore';
 
 interface LessonOverlayProps {
   step: LessonStep;
@@ -13,23 +13,6 @@ interface LessonOverlayProps {
   activityComplete: boolean;
 }
 
-/**
- * Compact lesson panel — anchored at the bottom of the canvas.
- *
- * Design goals:
- *  - Never taller than ~190px (desktop) / ~170px (mobile)
- *  - The 3D abacus always has ≥ 65% of canvas height
- *  - All 5 rods and all beads are visible at all times
- *  - On mobile: collapsible — tap the header bar to toggle the body open/closed
- *    so beads remain fully accessible while dragging
- *
- * Layout (always visible — top strip):
- *   [ emoji  Step N/7  Title ]   [ ← Prev ]  [ Next → ]  [ ✕ ]
- *
- * Layout (expandable body):
- *   Explanation text
- *   Activity instruction + live progress (if applicable)
- */
 export function LessonOverlay({
   step,
   stepIndex,
@@ -41,28 +24,29 @@ export function LessonOverlay({
   activityComplete,
 }: LessonOverlayProps) {
   const rods = useAbacusStore((s) => s.rods);
-  // Mobile: body starts open; user can collapse to expose beads
   const [bodyOpen, setBodyOpen] = useState(true);
 
-  const liveCount =
-    step.activity?.rodIndex !== undefined
-      ? (rods[step.activity.rodIndex]?.activeCount ?? 0)
+  const activity = step.activity;
+  const isInteractive =
+    activity?.type === 'set-digit' ||
+    activity?.type === 'set-number' ||
+    activity?.type === 'toggle-heaven' ||
+    activity?.type === 'count-earth';
+
+  const nextDisabled = isInteractive && !activityComplete;
+
+  const liveDigit =
+    activity?.rodIndex !== undefined
+      ? rodDigit(rods[activity.rodIndex] ?? { rodIndex: 0, heavenActive: false, earthActive: 0 })
       : 0;
 
-  const targetCount = step.activity?.targetCount ?? 0;
-  const isSetNumber = step.activity?.type === 'set-number';
-  const isCountBeads = step.activity?.type === 'count-beads';
-  const nextDisabled = (isSetNumber || isCountBeads) && !activityComplete;
+  const liveValue = sorobanValue(rods);
 
   return (
-    <div className="lesson-panel" role="region" aria-label="Lesson panel">
+    <div className="lesson-panel lesson-panel--enhanced" role="region" aria-label="Lesson panel">
 
-      {/* ══════════════════════════════════════════════════════
-          TOP BAR — always visible, contains all controls
-          ══════════════════════════════════════════════════════ */}
+      {/* ── Top bar ── */}
       <div className="lesson-bar">
-
-        {/* Left side: toggle + step info */}
         <button
           className="lesson-bar-toggle"
           onClick={() => setBodyOpen((v) => !v)}
@@ -70,16 +54,11 @@ export function LessonOverlay({
           aria-expanded={bodyOpen}
         >
           <span className="lesson-bar-emoji" aria-hidden="true">{step.emoji}</span>
-          <span className="lesson-bar-step">
-            {stepIndex + 1}/{totalSteps}
-          </span>
+          <span className="lesson-bar-step">{stepIndex + 1}/{totalSteps}</span>
           <span className="lesson-bar-title">{step.title}</span>
-          <span className="lesson-bar-chevron" aria-hidden="true">
-            {bodyOpen ? '▾' : '▸'}
-          </span>
+          <span className="lesson-bar-chevron" aria-hidden="true">{bodyOpen ? '▾' : '▸'}</span>
         </button>
 
-        {/* Right side: nav + exit */}
         <div className="lesson-bar-actions">
           <button
             className={`lesson-nav-btn lesson-nav-btn--secondary${stepIndex === 0 ? ' lesson-nav-btn--disabled' : ''}`}
@@ -89,64 +68,102 @@ export function LessonOverlay({
           >
             ←
           </button>
-          <button
-            className={`lesson-nav-btn lesson-nav-btn--primary${nextDisabled ? ' lesson-nav-btn--disabled' : ''}`}
-            onClick={onNext}
-            disabled={nextDisabled}
-            aria-label={isLastStep ? 'Finish lesson' : 'Next step'}
-          >
-            {isLastStep ? '🎉' : '→'}
-          </button>
-          <button
-            className="lesson-exit-btn"
-            onClick={onExit}
-            aria-label="Exit lesson"
-          >
-            ✕
-          </button>
+          <button className="lesson-exit-btn" onClick={onExit} aria-label="Exit lesson">✕</button>
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════
-          BODY — collapsible content area
-          ══════════════════════════════════════════════════════ */}
+      {/* ── Body ── */}
       {bodyOpen && (
         <div className="lesson-body">
 
-          {/* Explanation */}
-          <p className="lesson-explanation">{step.explanation}</p>
+          {/* Bilingual explanation */}
+          <div className="lesson-explanation-block">
+            <p className="lesson-explanation">{step.explanation}</p>
+            {step.tamilExplanation && (
+              <p className="lesson-explanation lesson-explanation--tamil">{step.tamilExplanation}</p>
+            )}
+          </div>
 
-          {/* Activity block */}
-          {step.activity && (
-            <div className={`lesson-activity${activityComplete ? ' lesson-activity--done' : ''}`}>
-              <span className="lesson-activity-icon" aria-hidden="true">
-                {isSetNumber ? '🖐️' : isCountBeads ? '👀' : '👁️'}
-              </span>
-              <span className="lesson-activity-instruction">
-                {step.activity.instruction}
-              </span>
+          {/* Activity card */}
+          {activity && (
+            <div className={`lesson-activity-card${activityComplete ? ' lesson-activity-card--done' : ''}`}>
 
-              {/* Live progress */}
-              {isSetNumber && (
-                <span className="lesson-progress" aria-live="polite">
-                  {activityComplete
-                    ? <span className="lesson-progress-done">✅ {liveCount} beads!</span>
-                    : <span className="lesson-progress-count">
-                        <strong>{liveCount}</strong> / <strong>{targetCount}</strong>
+              {/* Success state */}
+              {activityComplete ? (
+                <div className="lesson-success">
+                  <span className="lesson-success-icon">✅</span>
+                  <div className="lesson-success-text">
+                    <span className="lesson-success-en">Well done! Correct!</span>
+                    <span className="lesson-success-ta">சரியாக செய்தீர்கள்!</span>
+                  </div>
+                  {activity.type === 'set-digit' && (
+                    <span className="lesson-success-value">{liveDigit}</span>
+                  )}
+                  {activity.type === 'set-number' && (
+                    <span className="lesson-success-value">{liveValue}</span>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Instruction */}
+                  <div className="lesson-task-label">
+                    <span className="lesson-task-icon">🎯</span>
+                    <div className="lesson-task-text">
+                      <span className="lesson-task-en">{activity.instruction}</span>
+                      {activity.tamilInstruction && (
+                        <span className="lesson-task-ta">{activity.tamilInstruction}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Live progress */}
+                  {activity.type === 'set-digit' && (
+                    <div className="lesson-progress-bar-wrap" aria-live="polite">
+                      <span className="lesson-progress-label">
+                        Now / இப்போது: <strong>{liveDigit}</strong>
                       </span>
-                  }
-                </span>
-              )}
-              {isCountBeads && activityComplete && (
-                <span className="lesson-progress">
-                  <span className="lesson-progress-done">✅ {targetCount} beads!</span>
-                </span>
+                      <span className="lesson-progress-sep">→</span>
+                      <span className="lesson-progress-label">
+                        Target / இலக்கு: <strong>{activity.targetDigit ?? 0}</strong>
+                      </span>
+                    </div>
+                  )}
+                  {activity.type === 'set-number' && (
+                    <div className="lesson-progress-bar-wrap" aria-live="polite">
+                      <span className="lesson-progress-label">
+                        Now / இப்போது: <strong>{liveValue}</strong>
+                      </span>
+                      <span className="lesson-progress-sep">→</span>
+                      <span className="lesson-progress-label">
+                        Target / இலக்கு: <strong>{activity.targetNumber ?? 0}</strong>
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
-
         </div>
       )}
+
+      {/* ── Bottom: prominent Next Step button ── */}
+      <div className="lesson-next-bar">
+        <button
+          className={`lesson-next-btn${nextDisabled ? ' lesson-next-btn--disabled' : ' lesson-next-btn--ready'}${activityComplete ? ' lesson-next-btn--success' : ''}`}
+          onClick={onNext}
+          disabled={nextDisabled}
+          aria-label={isLastStep ? 'Finish lesson' : 'Next step'}
+        >
+          {isLastStep
+            ? '🎉 முடிந்தது! / Finish!'
+            : activityComplete
+              ? '✅ அடுத்தது / Next Step →'
+              : isInteractive
+                ? '🔒 மணிகளை நகர்த்துங்கள் / Move the beads first'
+                : 'அடுத்தது / Next Step →'
+          }
+        </button>
+      </div>
     </div>
   );
 }

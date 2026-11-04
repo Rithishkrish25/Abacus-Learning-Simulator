@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { AbacusScene } from '../components/AbacusScene';
-import { useAbacusStore, totalActive } from '../store/useAbacusStore';
+import { PlaceValueOverlay } from '../components/PlaceValueOverlay';
+import { useAbacusStore, sorobanValue } from '../store/useAbacusStore';
 import { useProgressStore, ALL_BADGES } from '../store/useProgressStore';
 import type { AppScreen } from '../App';
 
@@ -15,43 +16,35 @@ export function PracticeScreen({ onNavigate }: PracticeScreenProps) {
   const reset     = useAbacusStore((s) => s.reset);
   const undo      = useAbacusStore((s) => s.undo);
   const redo      = useAbacusStore((s) => s.redo);
+  const setNumber = useAbacusStore((s) => s.setNumber);
 
-  const total    = totalActive(rods);
+  const total    = sorobanValue(rods);
   const canUndo  = history.length > 0;
   const canRedo  = redoStack.length > 0;
 
   const recordPracticeSession = useProgressStore((s) => s.recordPracticeSession);
 
-  // Track whether the user interacted (moved at least one bead)
   const interactedRef = useRef(false);
-  // Track the highest bead count seen this session
-  const maxNumberRef = useRef(0);
-
-  // New badges to show as toast
+  const maxNumberRef  = useRef(0);
   const [newBadgeIds, setNewBadgeIds] = useState<string[]>([]);
 
-  // Watch for any bead moves
   useEffect(() => {
-    if (history.length > 0) {
-      interactedRef.current = true;
-    }
-    if (total > maxNumberRef.current) {
-      maxNumberRef.current = total;
-    }
+    if (history.length > 0) interactedRef.current = true;
+    if (total > maxNumberRef.current) maxNumberRef.current = total;
   }, [history.length, total]);
 
   const [targetRaw, setTargetRaw] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const target = targetRaw === '' ? null : parseInt(targetRaw, 10);
-  const targetValid = target !== null && !isNaN(target) && target >= 0 && target <= 50;
-  const matched = targetValid && total === target;
+  const target      = targetRaw === '' ? null : parseInt(targetRaw, 10);
+  const targetValid = target !== null && !isNaN(target) && target >= 0 && target <= 99999;
+  const matched     = targetValid && total === target;
 
   const handleTargetChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
-      if (raw === '' || /^\d{1,2}$/.test(raw)) {
-        if (raw === '' || parseInt(raw, 10) <= 50) {
+      if (raw === '' || /^\d{1,5}$/.test(raw)) {
+        if (raw === '' || parseInt(raw, 10) <= 99999) {
           setTargetRaw(raw);
         }
       }
@@ -59,17 +52,21 @@ export function PracticeScreen({ onNavigate }: PracticeScreenProps) {
     [],
   );
 
+  const handleShowOnAbacus = useCallback(() => {
+    if (targetValid && target !== null) {
+      setNumber(target);
+    }
+  }, [targetValid, target, setNumber]);
+
   const handleClearTarget = useCallback(() => {
     setTargetRaw('');
     inputRef.current?.focus();
   }, []);
 
   const handleBack = useCallback(() => {
-    // Record session only if the user actually moved beads
     if (interactedRef.current) {
       const earned = recordPracticeSession(maxNumberRef.current);
       if (earned.length > 0) {
-        // Show badge toasts briefly before navigating
         setNewBadgeIds(earned);
         setTimeout(() => {
           reset();
@@ -82,24 +79,20 @@ export function PracticeScreen({ onNavigate }: PracticeScreenProps) {
     onNavigate('home');
   }, [reset, onNavigate, recordPracticeSession]);
 
+  const diff = targetValid && target !== null ? total - target : 0;
+
   return (
     <div className="practice-root">
       <AbacusScene />
+      <PlaceValueOverlay />
 
       <div className="practice-hud" aria-label="Practice controls">
-
         {/* Top bar */}
         <div className="practice-top-bar">
-          <button
-            className="practice-back-btn"
-            onClick={handleBack}
-            aria-label="Back to main menu"
-          >
+          <button className="practice-back-btn" onClick={handleBack} aria-label="Back to main menu">
             ← Menu
           </button>
-          <span className="practice-screen-label" aria-hidden="true">
-            🎯 Free Practice
-          </span>
+          <span className="practice-screen-label" aria-hidden="true">🎯 Free Practice</span>
           <div className="practice-top-spacer" />
         </div>
 
@@ -107,20 +100,18 @@ export function PracticeScreen({ onNavigate }: PracticeScreenProps) {
 
         {/* Bottom panel */}
         <div className="practice-bottom-panel">
-
           <div className="practice-info-row">
 
             {/* Live total */}
             <div className={`practice-total${matched ? ' practice-total--matched' : ''}`}>
-              <span className="practice-total-label">You have</span>
+              <span className="practice-total-label">Soroban shows</span>
               <span className="practice-total-number">{total}</span>
-              <span className="practice-total-label">beads</span>
             </div>
 
-            {/* Target number section */}
+            {/* Target section */}
             <div className="practice-target-section">
               <label className="practice-target-label" htmlFor="practice-target-input">
-                Show this number:
+                Target (0–99999):
               </label>
               <div className="practice-target-row">
                 <input
@@ -130,53 +121,54 @@ export function PracticeScreen({ onNavigate }: PracticeScreenProps) {
                   type="number"
                   inputMode="numeric"
                   min={0}
-                  max={50}
-                  placeholder="0–50"
+                  max={99999}
+                  placeholder="0–99999"
                   value={targetRaw}
                   onChange={handleTargetChange}
-                  aria-label="Enter a target number from 0 to 50"
+                  aria-label="Enter a target number from 0 to 99999"
                 />
                 {targetRaw !== '' && (
-                  <button
-                    className="practice-clear-btn"
-                    onClick={handleClearTarget}
-                    aria-label="Clear target number"
-                  >
-                    ✕
-                  </button>
+                  <button className="practice-clear-btn" onClick={handleClearTarget} aria-label="Clear target">✕</button>
                 )}
               </div>
 
               {targetValid && (
-                <div
-                  className={`practice-match-feedback${matched ? ' practice-match-feedback--yes' : ' practice-match-feedback--no'}`}
-                  aria-live="polite"
-                >
-                  {matched
-                    ? '🎉 Yes! You made ' + target + '!'
-                    : total < target
-                      ? `Add ${target - total} more bead${target - total !== 1 ? 's' : ''}`
-                      : `Remove ${total - target} bead${total - target !== 1 ? 's' : ''}`
-                  }
-                </div>
+                <>
+                  <div
+                    className={`practice-match-feedback${matched ? ' practice-match-feedback--yes' : ' practice-match-feedback--no'}`}
+                    aria-live="polite"
+                  >
+                    {matched
+                      ? `🎉 Yes! You made ${target}!`
+                      : diff < 0
+                        ? `Need ${-diff} more`
+                        : `Remove ${diff}`
+                    }
+                  </div>
+                  {!matched && (
+                    <button
+                      className="practice-btn practice-btn--hint"
+                      onClick={handleShowOnAbacus}
+                      aria-label="Show target number on Soroban"
+                    >
+                      👁 Show me
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="practice-btn-row" role="group" aria-label="Abacus controls">
-            <button
-              className="practice-btn practice-btn--secondary"
-              onClick={reset}
-              aria-label="Reset all beads to zero"
-            >
+          {/* Controls */}
+          <div className="practice-btn-row" role="group" aria-label="Soroban controls">
+            <button className="practice-btn practice-btn--secondary" onClick={reset} aria-label="Reset">
               🔄 Reset
             </button>
             <button
               className={`practice-btn practice-btn--secondary${!canUndo ? ' practice-btn--disabled' : ''}`}
               onClick={undo}
               disabled={!canUndo}
-              aria-label="Undo last move"
+              aria-label="Undo"
             >
               ↩ Undo
             </button>
@@ -184,16 +176,15 @@ export function PracticeScreen({ onNavigate }: PracticeScreenProps) {
               className={`practice-btn practice-btn--secondary${!canRedo ? ' practice-btn--disabled' : ''}`}
               onClick={redo}
               disabled={!canRedo}
-              aria-label="Redo last undone move"
+              aria-label="Redo"
             >
               ↪ Redo
             </button>
           </div>
-
         </div>
       </div>
 
-      {/* Badge toast notifications */}
+      {/* Badge toasts */}
       {newBadgeIds.length > 0 && (
         <div className="badge-toast-stack" aria-live="polite">
           {newBadgeIds.map((id) => {

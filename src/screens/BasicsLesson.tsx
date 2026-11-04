@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AbacusScene } from '../components/AbacusScene';
+import { PlaceValueOverlay } from '../components/PlaceValueOverlay';
 import { LessonOverlay } from '../components/LessonOverlay';
 import { LessonComplete, CompletionAction } from '../components/LessonComplete';
-import { ABACUS_BASICS_STEPS } from '../lessons/abacusBasicsSteps';
-import { useAbacusStore } from '../store/useAbacusStore';
+import { BeadGuideOverlay } from '../components/BeadGuideOverlay';
+import { DemoAnimation } from '../components/DemoAnimation';
+import { SOROBAN_BASICS_STEPS } from '../lessons/sorobanLearningSteps';
+import { useAbacusStore, rodDigit, sorobanValue } from '../store/useAbacusStore';
 import { useProgressStore, ALL_BADGES } from '../store/useProgressStore';
 import { RodIndex } from '../types/abacus';
 import type { AppScreen } from '../App';
@@ -16,52 +19,88 @@ export function BasicsLesson({ onNavigate }: BasicsLessonProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showComplete, setShowComplete] = useState(false);
   const [newBadgeIds, setNewBadgeIds] = useState<string[]>([]);
+  const [showDemo, setShowDemo] = useState(false);
 
-  const setRodCount = useAbacusStore((s) => s.setRodCount);
-  const reset = useAbacusStore((s) => s.reset);
-  const rods = useAbacusStore((s) => s.rods);
+  const setRodDigit  = useAbacusStore((s) => s.setRodDigit);
+  const reset        = useAbacusStore((s) => s.reset);
+  const rods         = useAbacusStore((s) => s.rods);
 
   const recordLessonComplete = useProgressStore((s) => s.recordLessonComplete);
 
-  const totalSteps = ABACUS_BASICS_STEPS.length;
-  const step = ABACUS_BASICS_STEPS[currentStepIndex]!;
+  const totalSteps = SOROBAN_BASICS_STEPS.length;
+  const step = SOROBAN_BASICS_STEPS[currentStepIndex]!;
 
-  // Apply the step's targetState to the abacus whenever the step changes
+  // Apply targetState when step changes
   useEffect(() => {
-    if (!step.targetState) {
-      reset();
-      return;
-    }
     reset();
+    if (!step.targetState) return;
     const id = setTimeout(() => {
       step.targetState!.forEach((rod) => {
-        if (rod.activeCount > 0) {
-          setRodCount(rod.rodIndex as RodIndex, rod.activeCount);
+        if (rod.heavenActive || rod.earthActive > 0) {
+          const digit = (rod.heavenActive ? 5 : 0) + rod.earthActive;
+          setRodDigit(rod.rodIndex as RodIndex, digit);
         }
       });
-    }, 50);
+    }, 80);
     return () => clearTimeout(id);
+  }, [currentStepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Show demo animation when entering a set-digit interactive step
+  useEffect(() => {
+    const activity = step.activity;
+    if (activity && activity.type === 'set-digit' && activity.targetDigit !== undefined) {
+      // Small delay so the abacus resets first
+      const t = setTimeout(() => setShowDemo(true), 400);
+      return () => clearTimeout(t);
+    }
+    setShowDemo(false);
   }, [currentStepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Determine if the current activity is complete
   const activityComplete = (() => {
     const activity = step.activity;
     if (!activity) return true;
-    if (activity.type === 'observe') return true;
-    if (activity.type === 'set-number') {
-      const rodIdx = activity.rodIndex ?? 0;
-      const currentCount = rods[rodIdx]?.activeCount ?? 0;
-      return currentCount === (activity.targetCount ?? 0);
+    switch (activity.type) {
+      case 'observe':
+        return true;
+      case 'set-digit': {
+        const rodIdx = activity.rodIndex ?? 4;
+        const currentDigit = rodDigit(rods[rodIdx] ?? { rodIndex: 0, heavenActive: false, earthActive: 0 });
+        return currentDigit === (activity.targetDigit ?? 0);
+      }
+      case 'set-number': {
+        return sorobanValue(rods) === (activity.targetNumber ?? 0);
+      }
+      case 'toggle-heaven': {
+        const rodIdx = activity.rodIndex ?? 4;
+        return (rods[rodIdx]?.heavenActive ?? false) === (activity.targetDigit === 1);
+      }
+      case 'count-earth': {
+        const rodIdx = activity.rodIndex ?? 4;
+        return (rods[rodIdx]?.earthActive ?? 0) === (activity.targetDigit ?? 0);
+      }
+      default:
+        return true;
     }
-    if (activity.type === 'count-beads') return true;
-    return true;
+  })();
+
+  // Compute guide type for BeadGuideOverlay
+  const guideType = (() => {
+    const activity = step.activity;
+    if (!activity || activity.type === 'observe') return undefined;
+    if (activity.type === 'set-digit') {
+      return 'both-for-digit' as const;
+    }
+    if (activity.type === 'set-number') return undefined; // multi-rod, no single guide
+    if (activity.type === 'toggle-heaven') return 'heaven-down' as const;
+    if (activity.type === 'count-earth') return 'earth-up' as const;
+    return undefined;
   })();
 
   const handleNext = useCallback(() => {
     if (currentStepIndex < totalSteps - 1) {
       setCurrentStepIndex((i) => i + 1);
     } else {
-      // Lesson finished — record it and check for new badges
       const earned = recordLessonComplete();
       setNewBadgeIds(earned);
       setShowComplete(true);
@@ -93,7 +132,22 @@ export function BasicsLesson({ onNavigate }: BasicsLessonProps) {
 
   return (
     <div className="canvas-container">
-      <AbacusScene />
+      <AbacusScene highlightRods={step.highlightRods} />
+      <PlaceValueOverlay highlightRods={step.highlightRods} />
+      <BeadGuideOverlay
+        rodIndex={step.activity?.rodIndex}
+        guideType={guideType}
+        targetDigit={step.activity?.targetDigit}
+        complete={activityComplete}
+      />
+      {showDemo && step.activity?.type === 'set-digit' && (
+        <DemoAnimation
+          targetDigit={step.activity.targetDigit}
+          rodIndex={step.activity.rodIndex ?? 4}
+          guideType="both-for-digit"
+          onDone={() => setShowDemo(false)}
+        />
+      )}
       {!showComplete && (
         <LessonOverlay
           step={step}
@@ -109,7 +163,6 @@ export function BasicsLesson({ onNavigate }: BasicsLessonProps) {
       {showComplete && (
         <>
           <LessonComplete onAction={handleComplete} />
-          {/* New badge toast notifications */}
           {newBadgeIds.length > 0 && (
             <div className="badge-toast-stack" aria-live="polite">
               {newBadgeIds.map((id) => {
